@@ -1,6 +1,7 @@
 library(R6)
 library(data.table)
 library(digest) # for creating a hash
+library(jsonlite)
 
 # Defining the Run object
 Run <- R6Class("Run",
@@ -18,57 +19,57 @@ Run <- R6Class("Run",
       # Create the data.table with the correct column order
       self$nextflow_parameters <- data.table(
         parameter_name = character(),
-        value = logical(),
+        value = character(),
         flag = logical(),
         desc = character()
       )
 
       # Populate the data.table with parameter data
       self$nextflow_parameters <- rbindlist(list(
-        list("-E", FALSE, TRUE, "Exports all current system environment"),
-        list("-ansi-log", NULL, TRUE, "Enable/disable ANSI console logging"),
-        list("-bucket-dir", NULL, FALSE, "Remote bucket where intermediate result files are stored"),
-        list("-cache", NULL, TRUE, "Enable/disable processes caching"),
-        list("-disable-jobs-cancellation", NULL, TRUE, "Prevent the cancellation of child jobs on execution termination"),
-        list("-dsl1", FALSE, TRUE, "Execute the workflow using DSL1 syntax"),
-        list("-dsl2", FALSE, TRUE, "Execute the workflow using DSL2 syntax"),
-        list("-dump-channels", NULL, TRUE, "Dump channels for debugging purpose"),
-        list("-dump-hashes", FALSE, TRUE, "Dump task hash keys for debugging purpose"),
-        list("-e.", list(), FALSE, "Add the specified variable to execution environment"),
-        list("-entry", NULL, FALSE, "Entry workflow name to be executed"),
+        list(parameter_name = "-E", value = FALSE, flag = TRUE, desc = "Exports all current system environment"),
+        list(parameter_name = "-ansi-log", value = NA_character_, flag = TRUE, desc = "Enable/disable ANSI console logging"),
+        list(parameter_name = "-bucket-dir", value = NA_character_, flag = FALSE, desc = "Remote bucket where intermediate result files are stored"),
+        list(parameter_name = "-cache", value = NA_character_, flag = TRUE, desc = "Enable/disable processes caching"),
+        list(parameter_name = "-disable-jobs-cancellation", value = NA_character_, flag = TRUE, desc = "Prevent the cancellation of child jobs on execution termination"),
+        list(parameter_name = "-dsl1", value = FALSE, flag = TRUE, desc = "Execute the workflow using DSL1 syntax"),
+        list(parameter_name = "-dsl2", value = FALSE, flag = TRUE, desc = "Execute the workflow using DSL2 syntax"),
+        list(parameter_name = "-dump-channels", value = NA_character_, flag = TRUE, desc = "Dump channels for debugging purpose"),
+        list(parameter_name = "-dump-hashes", value = FALSE, flag = TRUE, desc = "Dump task hash keys for debugging purpose"),
+        list(parameter_name = "-e.", value = NA_character_, flag = FALSE, desc = "Add the specified variable to execution environment"),
+        list(parameter_name = "-entry", value = NA_character_, flag = FALSE, desc = "Entry workflow name to be executed"),
         list("-h, -help", FALSE, TRUE, "Print the command usage"),
-        list("-hub", NULL, FALSE, "Service hub where the project is hosted"),
-        list("-latest", FALSE, TRUE, "Pull latest changes before run"),
-        list("-lib", NULL, FALSE, "Library extension path"),
-        list("-main-script", NULL, FALSE, "The script file to be executed when launching a project directory or repository"),
-        list("-offline", FALSE, TRUE, "Do not check for remote project updates"),
-        list("-params-file", NULL, FALSE, "Load script parameters from a JSON/YAML file"),
-        list("-plugins", NULL, FALSE, "Specify the plugins to be applied for this run e.g. nf-amazon,nf-tower"),
-        list("-preview", FALSE, TRUE, "Run the workflow script skipping the execution of all processes"),
-        list("-process.", list(), FALSE, "Set process options"),
-        list("-profile", NULL, FALSE, "Choose a configuration profile"),
-        list("-queue-size", NULL, FALSE, "Max number of processes that can be executed in parallel by each executor"),
-        list("-resume", NULL, TRUE, "Execute the script using the cached results, useful to continue"),
-        list("-revision", NULL, FALSE, "Revision of the project to run (either a git branch, tag or commit SHA number)"),
-        list("-stub-run", FALSE, TRUE, "Execute the workflow replacing process scripts with command stubs"),
-        list("-test", NULL, FALSE, "Test a script function with the name specified"),
-        list("-user", NULL, FALSE, "Private repository user name"),
-        list("-with-apptainer", NULL, TRUE, "Enable process execution in a Apptainer container"),
-        list("-with-charliecloud", NULL, TRUE, "Enable process execution in a Charliecloud container runtime"),
-        list("-with-conda", NULL, TRUE, "Use the specified Conda environment package or file"),
-        list("-with-dag", NULL, TRUE, "Create pipeline DAG file"),
-        list("-with-docker", NULL, TRUE, "Enable process execution in a Docker container"),
-        list("-with-notification", NULL, TRUE, "Send a notification email on workflow completion to the specified recipients"),
-        list("-with-podman", NULL, TRUE, "Enable process execution in a Podman container"),
-        list("-with-singularity", NULL, TRUE, "Enable process execution in a Singularity container"),
-        list("-with-spack", NULL, TRUE, "Use the specified Spack environment package or file"),
-        list("-with-tower", NULL, TRUE, "Monitor workflow execution with Seqera Tower service"),
-        list("-with-weblog", NULL, TRUE, "Send workflow status messages via HTTP to target URL"),
-        list("-without-conda", NULL, TRUE, "Disable the use of Conda environments"),
-        list("-without-docker", FALSE, TRUE, "Disable process execution with Docker"),
-        list("-without-podman", NULL, TRUE, "Disable process execution in a Podman container"),
-        list("-without-spack", NULL, TRUE, "Disable the use of Spack environments"),
-        list("-work-dir", NULL, FALSE, "Directory where intermediate result files are stored")
+        list(parameter_name = "-hub", value = NA_character_, flag = FALSE, desc = "Service hub where the project is hosted"),
+        list(parameter_name = "-latest", value = FALSE, flag = TRUE, desc = "Pull latest changes before run"),
+        list("-lib", NA_character_, FALSE, "Library extension path"),
+        list(parameter_name = "-main-script", value = NA_character_, flag = FALSE, desc = "The script file to be executed when launching a project directory or repository"),
+        list(parameter_name = "-offline", value = FALSE, flag = TRUE, desc = "Do not check for remote project updates"),
+        list(parameter_name = "-params-file", value = NA_character_, flag = FALSE, desc = "Load script parameters from a JSON/YAML file"),
+        list(parameter_name = "-plugins", value = NA_character_, flag = FALSE, desc = "Specify the plugins to be applied for this run e.g. nf-amazon,nf-tower"),
+        list(parameter_name = "-preview", value = FALSE, flag = TRUE, desc = "Run the workflow script skipping the execution of all processes"),
+        list(parameter_name = "-process.", value = NA_character_, flag = FALSE, desc = "Set process options"),
+        list(parameter_name = "-profile", value = NA_character_, flag = FALSE, desc = "Choose a configuration profile"),
+        list(parameter_name = "-queue-size", value = NA_character_, flag = FALSE, desc = "Max number of processes that can be executed in parallel by each executor"),
+        list(parameter_name = "-resume", value = NA_character_, flag = TRUE, desc = "Execute the script using the cached results, useful to continue"),
+        list(parameter_name = "-revision", value = NA_character_, flag = FALSE, desc = "Revision of the project to run (either a git branch, tag or commit SHA number)"),
+        list(parameter_name = "-stub-run", value = FALSE, flag = TRUE, desc = "Execute the workflow replacing process scripts with command stubs"),
+        list(parameter_name = "-test", value = NA_character_, flag = FALSE, desc = "Test a script function with the name specified"),
+        list(parameter_name = "-user", value = NA_character_, flag = FALSE, desc = "Private repository user name"),
+        list(parameter_name = "-with-apptainer", value = NA_character_, flag = TRUE, desc = "Enable process execution in a Apptainer container"),
+        list(parameter_name = "-with-charliecloud", value = NA_character_, flag = TRUE, desc = "Enable process execution in a Charliecloud container runtime"),
+        list(parameter_name = "-with-conda", value = NA_character_, flag = TRUE, desc = "Use the specified Conda environment package or file"),
+        list(parameter_name = "-with-dag", value = NA_character_, flag = TRUE, desc = "Create pipeline DAG file"),
+        list(parameter_name = "-with-docker", value = NA_character_, flag = TRUE, desc = "Enable process execution in a Docker container"),
+        list(parameter_name = "-with-notification", value = NA_character_, flag = TRUE, desc = "Send a notification email on workflow completion to the specified recipients"),
+        list(parameter_name = "-with-podman", value = NA_character_, flag = TRUE, desc = "Enable process execution in a Podman container"),
+        list(parameter_name = "-with-singularity", value = NA_character_, flag = TRUE, desc = "Enable process execution in a Singularity container"),
+        list(parameter_name = "-with-spack", value = NA_character_, flag = TRUE, desc = "Use the specified Spack environment package or file"),
+        list(parameter_name = "-with-tower", value = NA_character_, flag = TRUE, desc = "Monitor workflow execution with Seqera Tower service"),
+        list(parameter_name = "-with-weblog", value = NA_character_, flag = TRUE, desc = "Send workflow status messages via HTTP to target URL"),
+        list(parameter_name = "-without-conda", value = NA_character_, flag = TRUE, desc = "Disable the use of Conda environments"),
+        list(parameter_name = "-without-docker", value = FALSE, flag = TRUE, desc = "Disable process execution with Docker"),
+        list(parameter_name = "-without-podman", value = NA_character_, flag = TRUE, desc = "Disable process execution in a Podman container"),
+        list(parameter_name = "-without-spack", value = NA_character_, flag = TRUE, desc = "Disable the use of Spack environments"),
+        list(parameter_name = "-work-dir", value = NA_character_, flag = FALSE, desc = "Directory where intermediate result files are stored")
       ), fill = TRUE)
 
       # tool parameters
@@ -81,27 +82,22 @@ Run <- R6Class("Run",
 
       extract_tool_parameters <- function(tool_parameters) {
         results_dt <- data.table(parameter = character(), value = character(), type = character(), desc = character())
-        # Check if the 'definitions' attribute exists
         if ("definitions" %in% names(tool_parameters)) {
-          # Iterate over the 'definitions'
           for (definition_name in names(tool_parameters$definitions)) {
             definition <- tool_parameters$definitions[[definition_name]]
-            # Check if 'properties' attribute exists in the current definition
             if ("properties" %in% names(definition)) {
               properties <- definition$properties
-              # Iterate over 'properties'
               for (property_name in names(properties)) {
                 property <- properties[[property_name]]
-                # Check if the 'default' attribute exists in the current property
                 if ("default" %in% names(property)) {
-                  # Extract other attributes as needed and add to the data table
                   default_value <- property$default
 
                   if (property_name == "validate_params") {
                     next
                   }
+
                   type <- property$type # As an example
-                  desc <- property$help_text
+                  desc <- paste(property$description, property$help_text, sep = "\n")
                   # Add the results as a new row to the data table
                   results_dt <- rbind(results_dt, list(
                     parameter = property_name,
@@ -160,7 +156,7 @@ Run <- R6Class("Run",
           message("* ", col, ": ", column_descriptions[[col]])
         }
         message("Returning empty data.table with required samplesheet columns...")
-        empty_dt <- data.table(setNames(nm = lapply(required_columns, function(col) character())))
+        empty_dt <- data.table(matrix(ncol = length(required_columns), dimnames = list(NULL, required_columns)))
         return(empty_dt)
       }
 
@@ -177,12 +173,13 @@ Run <- R6Class("Run",
       message(paste("Wrote samplesheet to", samplesheet_path))
 
       current_timestamp <- Sys.time()
-      formatted_timestamp <- format(current_timestamp, "%Y-%m-%d %H:%M:%S")
-      run_name <- paste("run_", formatted_timestamp)
+      formatted_timestamp <- format(current_timestamp, "%Y-%m-%d_%H_%M_%S")
+      print(formatted_timestamp)
+      run_name <- paste0("run_", formatted_timestamp)
       self$name <- run_name
 
       cmd <- paste(
-        "nextflow -bg run",
+        "nextflow run",
         shQuote(self$pipeline_path),
         "-with-report",
         "-with-trace",
@@ -192,19 +189,16 @@ Run <- R6Class("Run",
         paste("--input", shQuote(samplesheet_path))
       )
 
-      # Assuming self$tool_parameters is a data.table with 'parameter' and 'value' columns
       for (i in seq_len(nrow(self$tool_parameters))) {
         param <- self$tool_parameters[i, ]
         cmd <- paste(cmd, paste("--", param$parameter, " ", param$value, sep = ""))
       }
 
-      # Concatenate Nextflow and tool parameters
-      # Add single-dash for nextflow parameters
       for (i in seq_len(nrow(self$nextflow_parameters))) {
         param <- self$nextflow_parameters[i, ]
 
         # Check if the parameter is not NULL and not FALSE
-        if (!is.null(param$value) && param$value != FALSE) {
+        if (!is.na(param$value) && param$value != FALSE) {
           # For flag parameters, only the parameter name should be added
           if (param$flag) {
             cmd <- paste(cmd, paste("-", param$parameter_name))
@@ -214,7 +208,7 @@ Run <- R6Class("Run",
             } else {
               as.character(param$value)
             }
-            cmd <- paste(cmd, paste("-", param$parameter_name, " ", param_value_str))
+            cmd <- paste(cmd, paste(param$parameter_name, " ", param_value_str))
           }
         }
       }

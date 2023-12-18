@@ -1,0 +1,4 @@
+tests/testthat/.*
+tests/testthat/None
+tests/testthat/null/
+tests/testthat/pipeline_info/
