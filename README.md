@@ -49,6 +49,7 @@ run <- Run$new(pipeline_path, run_path, name = "test")
 run$tool_parameters[run$tool_parameters$parameter == "step", value := "sv_calling"]
 # set profile to docker (default is NA)
 run$nextflow_parameters[run$nextflow_parameters$parameter_name == "-profile", value := "docker"]
+```
 
 
 #### get_logs()
