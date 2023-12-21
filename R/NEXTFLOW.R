@@ -3,7 +3,19 @@ library(data.table)
 library(digest) # for creating a hash
 library(jsonlite)
 
-# Defining the Run object
+#' Run R6Class
+#'
+#' An R6 object representing a Nextflow pipeline run. The class manages the execution
+#' of the pipeline, as well as the retrieval of results and logs, and cleaning up 
+#' after execution.
+#'
+#' @field pipeline_path The path to the pipeline script or project directory.
+#' @field run_path The path to the directory where the pipeline results will be stored.
+#' @field name An optional name for the run. Defaults to a digest of `run_path` if `NULL`.
+#' @field nextflow_parameters A `data.table` holding parameters specific to Nextflow.
+#' @field tool_parameters A `data.table` holding parameters specific to the pipeline tools.
+#'
+#' @export
 Run <- R6Class("Run",
   public = list(
     pipeline_path = NULL,
@@ -11,6 +23,12 @@ Run <- R6Class("Run",
     name = NULL,
     nextflow_parameters = data.table(),
     tool_parameters = data.table(),
+
+    #' @description Initialize method of Run object
+    #' @param pipeline_path path to the pipeline script or project directory
+    #' @param run_path path to the directory where the pipeline results will be stored
+    #' @param name an optional name for the run, defaults to a digest of run_path
+    #' @export
     initialize = function(pipeline_path, run_path, name = NULL) {
       self$pipeline_path <- pipeline_path
       self$run_path <- run_path
@@ -115,6 +133,10 @@ Run <- R6Class("Run",
 
       self$tool_parameters <- extract_tool_parameters(nextflow_schema)
     },
+
+    #' @description Execute method for the Nextflow pipeline
+    #' @param samplesheet data.table or data.frame with samplesheet information to run the pipeline on
+    #' @export
     execute = function(samplesheet) {
       starting_step = self$tool_parameters[self$tool_parameters$parameter == "step", "value"]
 
@@ -217,6 +239,12 @@ Run <- R6Class("Run",
       message(cmd)
       system(cmd)
     },
+
+
+    #' @description Get the results of a pipeline run
+    #' Retrieves results from the results directory after the pipeline has been executed.
+    #' @return A data.table containing the paths to the results files.
+    #' @export
     get_results = function() {
       # Define the root results directory
       results_dir <- file.path(self$run_path, "results")
@@ -238,6 +266,11 @@ Run <- R6Class("Run",
 
       return(results_table)
     },
+
+    #' @description Get the logs of a Nextflow pipeline
+    #' Extracts and returns the Nextflow logs of the pipeline run.
+    #' @return A data.table containing extracted log information.
+    #' @export
     get_logs = function() {
       # Define a function that will extract the data from the Nextflow logs
       extract_nextflow_logs <- function(name) {
@@ -263,6 +296,10 @@ Run <- R6Class("Run",
         stop("No run found, you need to execute the run first!")
       }
     },
+    #' @description Clean method for cleaning up the Nextflow work directory
+    #' Executes the `nextflow clean` command with optional parameters.
+    #' @param clean_params character string with additional parameters for the `nextflow clean` command
+    #' @export
     clean = function(clean_params = "") {
       cmd <- paste("nextflow clean", clean_params)
       message("Cleaning up the work directory...")
