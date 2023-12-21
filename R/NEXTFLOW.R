@@ -1,3 +1,7 @@
+#' @importFrom jsonlite fromJSON toJSON
+#' @import R6
+#' @import data.table
+#' @import digest
 library(R6)
 library(data.table)
 library(digest) # for creating a hash
