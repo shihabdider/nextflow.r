@@ -3,13 +3,6 @@
 An R wrapper around nextflow to execute nextflow pipelines without leaving an R
 session.
 
-## Requirements
-- Run nextflow pipelines (e.g nf-jabba) from inside R
-- Easily retrieve log files for a particular run
-- Manage pipeline parameters and samplesheets
-- Monitor pipeline execution (files output and logs)
-* Incorporate AI (planned)
-
 ## Design
 - `Run` R6 object
 
@@ -17,9 +10,12 @@ session.
 
 #### constructor
 Inputs: 
+
     - pipeline_path: path to the pipeline repo/directory (e.g /nf-jabba)
     - run_path: path to the run directory (where the run will be executed, e.g ./)
-    - name: human readable name for the run (optional, should default to a hash)
+    - outdir: path to the output directory (if different from default `$run_path/results`)
+    - name: human readable name for the run (optional, will default to a hash or datestamp)
+
 Outputs: Run object
 
 #### execute()
@@ -46,32 +42,28 @@ run_path <- "/Users/diders01/projects/nextflowr/tests/testthat"
 
 run <- Run$new(pipeline_path, run_path, name = "test")
 # set the starting step to sv_calling (default is alignment)
-run$tool_parameters[run$tool_parameters$parameter == "step", value := "sv_calling"]
+run$tool_parameters$input_output_options$step$value = "sv_calling"
 # set profile to docker (default is NA)
 run$nextflow_parameters[run$nextflow_parameters$parameter_name == "-profile", value := "docker"]
 ```
-
-
 #### get_logs()
 retrieves paths to logs for the run
 
-Inputs: None, it should be able to run via its attributes
-Outputs: data.table containing paths to all log files and output files
+Inputs:
 
-#### check_status()
-reports the current output
+    - fields: a vector of field names to retrieve from logs (`c('name', 'workdir', 'status')` by default)
+    - list_all_fields: a boolean; if set returns all field names
 
-Inputs: None, it should be able to run via its attributes
-Outputs: prints the contents of the bg monitor file
+Outputs: data.table containing log data (columns correspond to fields)
+
+#### get_results()
+retrieves paths to output files for the run
+
+Inputs: None
+Outputs: data.table containing paths to all output files for all tools (columns are: sample, tool, filename, path)
 
 #### clean()
 clean up work directory
 
-Inputs: `nextflow clean` cli parameters (as string?)
-Outputs: Void, executes the run
-
-### Attributes:
-    - nextflow_parameters: data.table containing all parameters specific to
-      nextflow
-    - tool_parameters: data.table with parameters for each tool in the run
-    - name: name of the run
+Inputs: None
+Outputs: Void, runs `nextflow clean` to remove cached files
