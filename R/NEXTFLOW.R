@@ -1,4 +1,4 @@
-#' @importFrom jsonlite fromJSON toJSON
+#' @importFrom jsonlite fromJSON toJSON write_json
 #' @import R6
 #' @import data.table
 #' @import digest
@@ -20,6 +20,7 @@ Run <- R6Class("Run",
   public = list(
     pipeline_path = NULL,
     run_path = NULL,
+    outdir = NULL,
     name = NULL,
     nextflow_parameters = data.table(),
     tool_parameters = data.table(),
@@ -29,12 +30,12 @@ Run <- R6Class("Run",
     #' @param run_path path to the directory where the pipeline results will be stored
     #' @param name an optional name for the run, defaults to a digest of run_path
     #' @export
-    initialize = function(pipeline_path, run_path, name = NULL) {
+    initialize = function(pipeline_path, run_path, outdir=NULL, name = NULL) {
       self$pipeline_path <- pipeline_path
       self$run_path <- run_path
+      self$outdir <- ifelse(is.null(outdir), run_path, outdir)
       self$name <- ifelse(is.null(name), digest(run_path), name)
 
-      # Create the data.table with the correct column order
       self$nextflow_parameters <- data.table(
         parameter_name = character(),
         value = character(),
@@ -99,36 +100,33 @@ Run <- R6Class("Run",
       }
 
       extract_tool_parameters <- function(tool_parameters) {
-        results_dt <- data.table(parameter = character(), value = character(), type = character(), desc = character())
+        results_list <- list()
         if ("definitions" %in% names(tool_parameters)) {
           for (definition_name in names(tool_parameters$definitions)) {
+            definition_list <- list()
             definition <- tool_parameters$definitions[[definition_name]]
             if ("properties" %in% names(definition)) {
               properties <- definition$properties
               for (property_name in names(properties)) {
+                if (property_name == "validate_params") {
+                  next
+                }
                 property <- properties[[property_name]]
+                type <- property$type # As an example
+                desc <- paste(property$description, property$help_text, sep = "\n")
                 if ("default" %in% names(property)) {
                   default_value <- property$default
-
-                  if (property_name == "validate_params") {
-                    next
-                  }
-
-                  type <- property$type # As an example
-                  desc <- paste(property$description, property$help_text, sep = "\n")
-                  # Add the results as a new row to the data table
-                  results_dt <- rbind(results_dt, list(
-                    parameter = property_name,
-                    value = default_value,
-                    type = type,
-                    desc = desc
-                  ), fill = TRUE)
+                  definition_list[[property_name]] <- list(value=default_value, type=type, description=desc)
+                } else {
+                  definition_list[[property_name]] <- list(type=type, description=desc)
                 }
+                # Add the results as a new entry to the list
               }
             }
+            results_list[[definition_name]] <- definition_list
           }
         }
-        return(results_dt)
+        return(results_list)
       }
 
       self$tool_parameters <- extract_tool_parameters(nextflow_schema)
@@ -138,7 +136,7 @@ Run <- R6Class("Run",
     #' @param samplesheet data.table or data.frame with samplesheet information to run the pipeline on
     #' @export
     execute = function(samplesheet) {
-      starting_step = self$tool_parameters[self$tool_parameters$parameter == "step", "value"]
+      starting_step = self$tool_parameters$input_output_options$step$value
 
       # Define a list holding required columns with descriptions
       column_descriptions <- list(
@@ -177,7 +175,7 @@ Run <- R6Class("Run",
         for (col in missing_columns) {
           message("* ", col, ": ", column_descriptions[[col]])
         }
-        message("Returning empty data.table with required samplesheet columns...")
+        message("Returning empty data.table with required samplesheet columns (assign this to a variable)...")
         empty_dt <- data.table(matrix(ncol = length(required_columns), dimnames = list(NULL, required_columns)))
         return(empty_dt)
       }
@@ -196,9 +194,32 @@ Run <- R6Class("Run",
 
       current_timestamp <- Sys.time()
       formatted_timestamp <- format(current_timestamp, "%Y-%m-%d_%H_%M_%S")
-      print(formatted_timestamp)
       run_name <- paste0("run_", formatted_timestamp)
       self$name <- run_name
+      print(paste0("Current run name: ", self$name))
+
+      flatten_parameters <- function(parameters) {
+        flattened_list <- list()
+        for(definition_name in names(self$tool_parameters)) {
+          definition <- self$tool_parameters[[definition_name]]
+          for(property_name in names(definition)) {
+            if (!is.null(definition[[property_name]]$value)) {
+              default_value <- definition[[property_name]]$value
+              flattened_list[[property_name]] <- default_value
+            }
+          }
+        }
+
+        # flattened_list now contains [ property_name: default_value ]
+        return(flattened_list)
+      }
+
+
+      params_json = flatten_parameters(self$tool_parameters)
+      # Continue with execution if all required columns are present...
+      params_json_path <- file.path(self$run_path, paste0(self$name, "_params.json"))
+      jsonlite::write_json(params_json, params_json_path, auto_unbox = TRUE)
+      message(paste("Wrote parameters for this run to", params_json_path))
 
       cmd <- paste(
         "nextflow run",
@@ -206,15 +227,11 @@ Run <- R6Class("Run",
         "-with-report",
         "-with-trace",
         "-with-timeline",
-        paste("-name ", self$name),
-        paste("--outdir", shQuote(self$run_path)),
-        paste("--input", shQuote(samplesheet_path))
+        paste("-name", self$name),
+        paste("-params-file", shQuote(params_json_path)),
+        paste("--input", shQuote(samplesheet_path)),
+        paste("--outdir", shQuote(self$outdir))
       )
-
-      for (i in seq_len(nrow(self$tool_parameters))) {
-        param <- self$tool_parameters[i, ]
-        cmd <- paste(cmd, paste("--", param$parameter, " ", param$value, sep = ""))
-      }
 
       for (i in seq_len(nrow(self$nextflow_parameters))) {
         param <- self$nextflow_parameters[i, ]
@@ -247,7 +264,7 @@ Run <- R6Class("Run",
     #' @export
     get_results = function() {
       # Define the root results directory
-      results_dir <- file.path(self$run_path, "results")
+      results_dir <- file.path(self$outdir)
 
       # Check if the results directory exists
       if (!dir.exists(results_dir)) {
@@ -256,12 +273,20 @@ Run <- R6Class("Run",
 
       # Recursively list all files
       files <- list.files(path = results_dir, recursive = TRUE, full.names = TRUE)
+      # Filter out files that are in the pipeline_info or tabix directory
+      exclude_patterns <- c(
+        paste0("^", gsub("/", "\\/", file.path(results_dir, "pipeline_info")), "/"),
+        paste0("^", gsub("/", "\\/", file.path(results_dir, "tabix")), "/"),
+        paste0("^", gsub("/", "\\/", file.path(results_dir, "msisensorpro")), "/"),
+        paste0("^", gsub("/", "\\/", file.path(results_dir, "null")), "/")
+      )
+      combined_exclude_pattern <- paste(exclude_patterns, collapse = "|")
+      files <- files[!grepl(combined_exclude_pattern, files)]
 
-      # Create data table with sample and tool information
       results_table <- data.table::rbindlist(lapply(files, function(file) {
-        # Extract tool and sample name from the file path
-        tool_sample <- strsplit(dirname(file), split = "/")[[1]][c(1,2)]
-        data.table(sample = tool_sample[2], tool = tool_sample[1], path = file)
+        path_parts <- unlist(strsplit(file, split = "/"))
+        tool_sample <- path_parts[(length(path_parts)-2):(length(path_parts))]
+        data.table(sample = tool_sample[2], tool = tool_sample[1], path = file, filename=tool_sample[3])
       }))
 
       return(results_table)
@@ -269,27 +294,39 @@ Run <- R6Class("Run",
 
     #' @description Get the logs of a Nextflow pipeline
     #' Extracts and returns the Nextflow logs of the pipeline run.
+    #' @param fields a vector containing fields to extract from the log.
+    #' @param list_all_fields a boolean to print all available fields as a vector
     #' @return A data.table containing extracted log information.
     #' @export
-    get_logs = function() {
-      # Define a function that will extract the data from the Nextflow logs
+    get_logs = function(
+      fields=c('workdir', 'name', 'status'), 
+      list_all_fields=FALSE
+    ) {
       extract_nextflow_logs <- function(name) {
         command <- "nextflow"
-        args <- c("log", name, "-f", "workdir,name")
+        args <- c("log", name, "-f", paste0(fields, collapse=','))
         output <- system2(command, args, stdout = TRUE)
 
-        # Split the output into lines
-        lines <- strsplit(output, "\n")[[1]]
+        # Split each line by tab to separate attributes
+        records <- lapply(output, function(x) unlist(strsplit(x, "\t")))
 
-        # Create a data.frame from the lines
-        parsed_output <- do.call(rbind, strsplit(lines, "\\s+", perl = TRUE))
-
-        # Create the data.table
-        log_table <- data.table(name = parsed_output[, 2], work_dir = parsed_output[, 1])
+        # Create the data.table directly
+        log_table <- data.table(do.call(cbind, lapply(seq_along(records[[1]]), function(i) {
+          sapply(records, `[`, i)
+        })))
+        setnames(log_table, fields)
 
         return(log_table)
       }
-      if (self$name) {
+
+      if (list_all_fields) {
+        command <- "nextflow"
+        args <- c("log", "-l")
+        output <- system2(command, args, stdout = TRUE)
+        return(trimws(output))
+      }
+
+      if (self$name != "") {
         log_table <- extract_nextflow_logs(self$name)
         return(log_table)
       } else {
